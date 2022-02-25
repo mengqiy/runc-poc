@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
+	"io/ioutil"
 	"os"
 	"runtime"
 
@@ -26,7 +28,12 @@ func init() {
 }
 
 func main() {
-	store, err := images.NewStore("/usr/local/google/home/mengqiy/.cache/runm")
+	var inConfigFile = flag.String("config-file", "config.json", "input config file")
+	flag.Parse()
+
+	logrus.Info(*inConfigFile)
+
+	store, err := images.NewStore("/home/mengqiy/.cache/runm")
 	if err != nil {
 		logrus.Fatal(err)
 		return
@@ -58,7 +65,8 @@ func main() {
 	// }
 	// config := GetConfig(devicesRules)
 
-	config, err := getConfig(false, extractedImage.ExtractedDir)
+	// config, err := getConfig(false, extractedImage.ExtractedDir)
+	config, err := getConfig(*inConfigFile, extractedImage.ExtractedDir)
 	if err != nil {
 		logrus.Fatal(err)
 		return
@@ -97,21 +105,35 @@ func main() {
 	container.Destroy()
 }
 
-func getConfig(rootful bool, rootfs string) (*configs.Config, error) {
-	var cfg string
-	if rootful {
-		cfg = rootfulConfigJson
-	} else {
-		cfg = rootlessConfigJson
+func getConfig(inputPath, rootfs string) (*configs.Config, error) {
+	in, err := ioutil.ReadFile(inputPath)
+	if err != nil {
+		return nil, err
 	}
 	var config configs.Config
-	err := json.Unmarshal([]byte(cfg), &config)
+	err = json.Unmarshal(in, &config)
 	if err != nil {
 		return nil, err
 	}
 	config.Rootfs = rootfs
 	return &config, nil
 }
+
+// func getConfig(rootful bool, rootfs string) (*configs.Config, error) {
+// 	var cfg string
+// 	if rootful {
+// 		cfg = rootfulConfigJson
+// 	} else {
+// 		cfg = rootlessConfigJson
+// 	}
+// 	var config configs.Config
+// 	err := json.Unmarshal([]byte(cfg), &config)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	config.Rootfs = rootfs
+// 	return &config, nil
+// }
 
 const rootlessConfigJson = `{
    "no_pivot_root":false,
