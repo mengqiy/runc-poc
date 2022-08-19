@@ -14,6 +14,8 @@ import (
 )
 
 func init() {
+	logrus.Info("os.Args", os.Args)
+
 	if len(os.Args) > 1 && os.Args[1] == "init" {
 		runtime.GOMAXPROCS(1)
 		runtime.LockOSThread()
@@ -26,6 +28,11 @@ func init() {
 }
 
 func main() {
+	// var inConfigFile = flag.String("config-file", "config.json", "input config file")
+	// flag.Parse()
+
+	// logrus.Info(*inConfigFile)
+
 	store, err := images.NewStore("/usr/local/google/home/mengqiy/.cache/runm")
 	if err != nil {
 		logrus.Fatal(err)
@@ -36,7 +43,7 @@ func main() {
 	// 	logrus.Fatal(err)
 	// 	return
 	// }
-	extractedImage, err := store.Extract(context.Background(), "alpine:3.15.0")
+	extractedImage, err := store.Extract(context.Background(), "gcr.io/kpt-fn/gatekeeper:v0")
 	if err != nil {
 		logrus.Fatal(err)
 		return
@@ -58,13 +65,14 @@ func main() {
 	// }
 	// config := GetConfig(devicesRules)
 
-	config, err := getConfig(false, extractedImage.ExtractedDir)
+	// config, err := getConfig(false, extractedImage.ExtractedDir)
+	config, err := getConfig(extractedImage.ExtractedDir)
 	if err != nil {
 		logrus.Fatal(err)
 		return
 	}
 
-	container, err := factory.Create("mycontainerid", &config)
+	container, err := factory.Create("mycontainerid", config)
 	if err != nil {
 		logrus.Fatal(err)
 		return
@@ -97,19 +105,41 @@ func main() {
 	container.Destroy()
 }
 
-func getConfig(rootful bool, rootfs string) (*configs.Config, error) {
+func getConfig(rootfs string) (*configs.Config, error) {
+	// in, err := ioutil.ReadFile(inputPath)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	var config configs.Config
 	err := json.Unmarshal([]byte(rootlessConfigJson), &config)
 	if err != nil {
 		return nil, err
 	}
+	config.Rootfs = rootfs
 	return &config, nil
 }
 
+// func getConfig(rootful bool, rootfs string) (*configs.Config, error) {
+// 	var cfg string
+// 	if rootful {
+// 		cfg = rootfulConfigJson
+// 	} else {
+// 		cfg = rootlessConfigJson
+// 	}
+// 	var config configs.Config
+// 	err := json.Unmarshal([]byte(cfg), &config)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	config.Rootfs = rootfs
+// 	return &config, nil
+// }
+
+// Rootless docker use the following config when running with runc.
+// This config can be converted to a golang object using the struct defined in libcontainer.
 const rootlessConfigJson = `{
    "no_pivot_root":false,
    "parent_death_signal":0,
-   "rootfs":"/usr/local/google/home/mengqiy/.cache/runm/index-docker-io-library-alpine-3-15-0_e7d88de73db3d3fd9b2d63aa7f447a10fd0220b7cbf39803c803f2af9ba256b3",
    "umask":null,
    "readonlyfs":true,
    "rootPropagation":0,
@@ -489,19 +519,18 @@ const rootlessConfigJson = `{
       "startContainer":null
    },
    "version":"1.0.2-dev",
-   "labels":[
-      "bundle=/usr/local/google/home/mengqiy/mycontainer"
-   ],
    "no_new_keyring":false,
    "rootless_euid":true,
    "rootless_cgroups":true
 }
 `
 
+
+// Rootful docker use the following config when running with runc.
+// This config can be converted to a golang object using the struct defined in libcontainer.
 const rootfulConfigJson = `{
    "no_pivot_root":false,
    "parent_death_signal":0,
-   "rootfs":"/mycontainer/rootfs",
    "umask":null,
    "readonlyfs":true,
    "rootPropagation":0,
@@ -891,9 +920,6 @@ const rootfulConfigJson = `{
       "startContainer":null
    },
    "version":"1.0.2-dev",
-   "labels":[
-      "bundle=/mycontainer"
-   ],
    "no_new_keyring":false
 }
 `
